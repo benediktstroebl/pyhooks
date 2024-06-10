@@ -18,12 +18,6 @@ class MiddlemanSettings(BaseModel):
     cache_key: str | None = None
 
 
-class MiddlemanServerRequest(BaseModel):
-    settings: MiddlemanSettings
-    prompt: str | None = None
-    chat_prompt: list[dict] | None = None
-
-
 class MiddlemanModelOutput(BaseModel):
     completion: str
     logprobs: Any | None = None
@@ -58,6 +52,7 @@ class GenerationRequest(BaseModel):
     functions: Optional[Any] = None
     description: Optional[str] = None
     prompt: Optional[str] = None
+    extraParameters: dict[str, Any] | None = None
 
 
 class RatingOption(BaseModel):

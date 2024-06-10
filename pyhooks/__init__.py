@@ -3,7 +3,6 @@ import functools
 import json
 import os
 import random
-import subprocess
 import sys
 import time
 import traceback
@@ -12,10 +11,9 @@ from typing import Any, Callable, Optional
 from urllib.parse import quote_plus
 
 import aiohttp
-import tiktoken
-from functools import cache
-from pydantic import BaseModel
 import sentry_sdk
+import tiktoken
+from pydantic import BaseModel
 
 from . import env
 from .execs import ActionViolatesSafetyPolicyException, run_bash, run_python
@@ -24,14 +22,13 @@ from .types import (
     GenerationRequest,
     MiddlemanResult,
     MiddlemanSettings,
+    ModelInfo,
     OpenaiChatMessage,
     RatedOption,
     RatingOption,
     RunUsageAndLimits,
     TaskInfo,
-    ModelInfo,
 )
-
 
 RETRY_PERIOD_DISCONNECTED = 7
 RETRY_PERIOD_ERROR = 20
@@ -78,7 +75,12 @@ class FatalError(Exception):
     pass
 
 
-async def trpc_server_request(reqtype: str, route: str, data_arg: dict) -> Any:
+async def trpc_server_request(
+    reqtype: str,
+    route: str,
+    data_arg: dict,
+    session: aiohttp.ClientSession | None = None,
+) -> Any:
     data = data_arg
     base = 5
     if reqtype not in ["mutation", "query"]:
@@ -86,7 +88,7 @@ async def trpc_server_request(reqtype: str, route: str, data_arg: dict) -> Any:
     for i in range(0, 100000):
         try:
             response_status, response_json = await trpc_server_request_raw(
-                reqtype, route, data
+                reqtype, route, data, session=session
             )
             if response_status in [400, 401, 403, 404, 413]:
                 raise FatalError(
@@ -140,16 +142,21 @@ async def trpc_server_request(reqtype: str, route: str, data_arg: dict) -> Any:
         await asyncio.sleep(sleep_time)
 
 
-async def trpc_server_request_raw(reqtype: str, route: str, data: dict) -> Any:
+async def trpc_server_request_raw(
+    reqtype: str, route: str, data: dict, session: aiohttp.ClientSession | None
+) -> Any:
     if isinstance(data, BaseModel):
         data = data.dict()
+
+    session = session or get_hooks_api_http_session()
+
     async with (
-        get_hooks_api_http_session().get(
+        session.get(
             f"{env.API_URL}/{route}?input={quote_plus(json.dumps(data))}",
             headers={"accept": "application/json", "X-Agent-Token": env.AGENT_TOKEN},
         )
         if reqtype == "query"
-        else get_hooks_api_http_session().post(
+        else session.post(
             f"{env.API_URL}/{route}",
             json=data,
             headers={"accept": "application/json", "X-Agent-Token": env.AGENT_TOKEN},
@@ -305,9 +312,18 @@ class Hooks(BaseModel):
     async def submit(self, submission: str):
         if not env.TASK_ID:
             raise Exception("TASK_ID not set")
-        await trpc_server_request(
-            "mutation", "submit", self.make_trace_entry({"value": submission})
-        )
+
+        async with aiohttp.ClientSession(
+            # No timeout because scoring the submission can take a long time
+            timeout=aiohttp.ClientTimeout(),
+        ) as session:
+            await trpc_server_request(
+                "mutation",
+                "submit",
+                self.make_trace_entry({"value": submission}),
+                session=session,
+            )
+
         exit(0)
 
     async def generate(
@@ -319,6 +335,7 @@ class Hooks(BaseModel):
         messages: list[OpenaiChatMessage] | None = None,
         description: Optional[str] = None,
         functions: Optional[Any] = None,
+        extraParameters: dict[str, Any] | None = None,
     ) -> MiddlemanResult:
         genReq = GenerationRequest(
             settings=settings,
@@ -328,6 +345,7 @@ class Hooks(BaseModel):
             description=description,
             functions=functions,
             prompt=prompt,
+            extraParameters=extraParameters,
         )
         req = _new_base_event() | {"genRequest": genReq.dict()}
         return MiddlemanResult(
@@ -365,6 +383,7 @@ class Hooks(BaseModel):
         prompt: str | None = None,
         messages: list[OpenaiChatMessage] | None = None,
         description: Optional[str] = None,
+        extraParameters: dict[str, Any] | None = None,
     ) -> str:
         if settings.n != 1:
             raise Exception(
@@ -377,6 +396,7 @@ class Hooks(BaseModel):
             messages=messages,
             description=description,
             prompt=prompt,
+            extraParameters=extraParameters,
         )
         if result.error is not None or result.outputs is None:
             raise Exception("Generation error", result.error)
@@ -390,6 +410,7 @@ class Hooks(BaseModel):
         prompt: str | None = None,
         messages: list[OpenaiChatMessage] | None = None,
         description: Optional[str] = None,
+        extraParameters: dict[str, Any] | None = None,
     ) -> list[str]:
         result = await self.generate(
             settings=settings,
@@ -398,6 +419,7 @@ class Hooks(BaseModel):
             messages=messages,
             description=description,
             prompt=prompt,
+            extraParameters=extraParameters,
         )
         if result.error is not None or result.outputs is None:
             raise Exception("Generation error", result.error)
