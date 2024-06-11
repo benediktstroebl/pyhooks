@@ -111,11 +111,13 @@ class OtherGenerationParams(BaseModel):
 
 class RunUsage(BaseModel):
     tokens: int
+    actions: int
     total_seconds: int
 
 
 class UsageCheckpoint(BaseModel):
     tokens: int | None
+    actions: int | None
     total_seconds: int | None
 
 
