@@ -113,12 +113,14 @@ class RunUsage(BaseModel):
     tokens: int
     actions: int
     total_seconds: int
+    cost: float
 
 
 class UsageCheckpoint(BaseModel):
     tokens: int | None
     actions: int | None
     total_seconds: int | None
+    cost: float | None
 
 
 class RunUsageAndLimits(BaseModel):
