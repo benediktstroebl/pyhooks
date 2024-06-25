@@ -75,6 +75,15 @@ class FatalError(Exception):
     pass
 
 
+class RateLimitedTime:
+    start: int
+    end: Optional[int]
+
+    def __init__(self):
+        self.start = timestamp_now()
+        self.end = None
+
+
 async def trpc_server_request(
     reqtype: str,
     route: str,
@@ -85,7 +94,9 @@ async def trpc_server_request(
     base = 5
     if reqtype not in ["mutation", "query"]:
         raise Exception("reqtype must be mutation or query")
+    rate_limited_time = RateLimitedTime()
     for i in range(0, 100000):
+        response_status = None
         try:
             response_status, response_json = await trpc_server_request_raw(
                 reqtype, route, data, session=session
@@ -112,6 +123,19 @@ async def trpc_server_request(
                 raise TRPCErrorField(
                     "Hooks api error on", route, response_json["error"]
                 )
+            if rate_limited_time.end != None:
+                # Insert pause for the amount of time spent rate limited
+                await trpc_server_request(
+                    "mutation",
+                    "insertPause",
+                    {
+                        "runId": env.RUN_ID,
+                        "agentBranchNumber": env.AGENT_BRANCH_NUMBER,
+                        "start": rate_limited_time.start,
+                        "end": rate_limited_time.end,
+                    },
+                )
+
             return response_json["result"].get("data")
         except FatalError as e:
             raise e
@@ -140,6 +164,9 @@ async def trpc_server_request(
         sleep_time = min(base**i, max_sleep_time)
         sleep_time *= random.uniform(0.1, 1.0)
         await asyncio.sleep(sleep_time)
+
+        if response_status == 429:
+            rate_limited_time.end = timestamp_now()
 
 
 async def trpc_server_request_raw(
@@ -241,7 +268,7 @@ class Hooks(BaseModel):
 
     def log(self, *content: Any):
         return self.log_with_attributes(None, *content)
-    
+
     def log_with_attributes(self, attributes: dict | None, *content: Any):
         entry = self.make_trace_entry({"content": content, "attributes": attributes})
         asyncio.create_task(trpc_server_request("mutation", "log", entry))
