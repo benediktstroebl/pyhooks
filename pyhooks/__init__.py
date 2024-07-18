@@ -45,6 +45,12 @@ sentry_sdk.init(
 )
 
 
+retry_blacklisted_error_messages = [
+    "rating tokens have low probability",
+    "The model produced invalid content",
+]
+
+
 def get_hooks_api_http_session():
     global hooks_api_http_session
     if hooks_api_http_session is None:
@@ -110,8 +116,10 @@ async def trpc_server_request(
                 if (
                     response_json.get("error") is not None
                     and response_json["error"].get("message") is not None
-                    and "rating tokens have low probability"
-                    in response_json["error"]["message"]
+                    and any(
+                        m in response_json["error"]["message"]
+                        for m in retry_blacklisted_error_messages
+                    )
                 ):
                     raise FatalError(
                         f"Hooks api error blacklisted from retry, NOT retrying {route} status {response_status} {response_json}"
