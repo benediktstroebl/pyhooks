@@ -34,6 +34,14 @@ def _seek_and_read_file(file_path: str, seek_to: int):
         return ""
 
 
+def _read_int_from_file(file_path: str) -> int | None:
+    try:
+        with open(file_path, "r") as f:
+            return int(f.read().strip())
+    except FileNotFoundError:
+        return None
+
+
 def _maybe_update_agent_command_result():
     global _stdout_length, _stderr_length
 
@@ -49,11 +57,8 @@ def _maybe_update_agent_command_result():
     )
     _stderr_length += len(stderr_to_append)
 
-    try:
-        with open(f"{output_path}/exit_status", "r") as f:
-            exit_status = int(f.read().strip())
-    except FileNotFoundError:
-        exit_status = None
+    exit_status = _read_int_from_file(f"{output_path}/exit_status")
+    agent_pid = _read_int_from_file(f"{output_path}/agent_pid")
 
     if stdout_to_append or stderr_to_append or exit_status is not None:
         asyncio.run(
@@ -61,6 +66,7 @@ def _maybe_update_agent_command_result():
                 stdout_to_append=stdout_to_append,
                 stderr_to_append=stderr_to_append,
                 exit_status=exit_status,
+                agent_pid=agent_pid,
             )
         )
 
