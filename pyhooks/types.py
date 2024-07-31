@@ -16,6 +16,7 @@ class MiddlemanSettings(BaseModel):
     logit_bias: dict[str, float] | None = None
     function_call: Any | None = None
     cache_key: str | None = None
+    delegation_token: str | None = None
 
 
 class MiddlemanModelOutput(BaseModel):

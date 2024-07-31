@@ -83,7 +83,7 @@ echo $? > {returncode_path}; pwd > ~/.last_dir; declare -p > ~/.last_env ) > {st
 
 async def run_python(
     code: str,
-    timeout: float,
+    timeout_sec: float,
     wait_after_kill=15.0,
     minimum_free_ram_bytes=800_000_000,
     log=False,
@@ -110,7 +110,7 @@ async def run_python(
                 "http://localhost:9712/run_python",
                 json={
                     "code": code,
-                    "timeout": timeout,
+                    "timeout": timeout_sec,
                     "wait_after_kill": wait_after_kill,
                     "minimum_free_ram_bytes": minimum_free_ram_bytes,
                     "log": log,
@@ -124,9 +124,7 @@ async def run_python(
                 )
         except Exception as e:
             print(f"Error connecting to python server: {e}", file=sys.stderr)
-            return (
-                "Unknown error. May be caused by python code timeout after 25 minutes."
-            )
+            return f"Unknown error. May be caused by python code timeout after 25 minutes. Details: {e}"
 
 
 async def _run_tests():

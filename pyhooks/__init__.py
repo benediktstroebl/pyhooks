@@ -1,3 +1,8 @@
+"""
+A Python library that lets MP4 agents interact with MP4.
+pyhooks also contains other code shared between METR agents.
+"""
+
 import asyncio
 import functools
 import json
@@ -63,7 +68,6 @@ def get_hooks_api_http_session():
 
 
 def timestamp_now():
-    "wow python is bad at this"
     return int(datetime.utcnow().timestamp() * 1000)
 
 
@@ -348,6 +352,8 @@ class Hooks(BaseModel):
         return TaskInfo(**res)
 
     async def submit(self, submission: str):
+        if not isinstance(submission, str):
+            raise TypeError(f"submission must be a string, got {type(submission)}")
         if not env.TASK_ID:
             raise Exception("TASK_ID not set")
 

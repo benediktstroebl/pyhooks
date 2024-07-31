@@ -61,7 +61,6 @@ class PrefixedFile:
         self.on_newline = True
 
     def write(self, s: str):
-        "handling first and last line is annoying"
         if not s:
             return
         if self.on_newline:
