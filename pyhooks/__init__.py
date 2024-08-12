@@ -1,5 +1,5 @@
 """
-A Python library that lets MP4 agents interact with MP4.
+A Python library that lets Vivaria agents interact with Vivaria.
 pyhooks also contains other code shared between METR agents.
 """
 
@@ -627,6 +627,28 @@ class Hooks(BaseModel):
             },
         )
         return RunUsageAndLimits(**res)
+
+    async def pause(self):
+        await trpc_server_request(
+            "mutation",
+            "insertPause",
+            {
+                "runId": env.RUN_ID,
+                "agentBranchNumber": env.AGENT_BRANCH_NUMBER,
+                "start": timestamp_now(),
+                "end": None,
+            },
+        )
+
+    async def unpause(self):
+        await trpc_server_request(
+            "mutation",
+            "unpause",
+            {
+                "runId": env.RUN_ID,
+                "agentBranchNumber": env.AGENT_BRANCH_NUMBER,
+            },
+        )
 
 
 def _new_base_event() -> dict[str, Any]:
