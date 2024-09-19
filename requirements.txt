@@ -1,9 +1,9 @@
 aiohttp
 pydantic
-pdb_attach==3.0.0
+pdb_attach
 tiktoken
-py-spy==0.3.14
+py-spy
 ipython
 beautifulsoup4
-nest-asyncio==1.6.0
+nest-asyncio
 sentry-sdk
