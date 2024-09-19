@@ -4,6 +4,6 @@ pdb_attach==3.0.0
 tiktoken
 py-spy==0.3.14
 ipython
-beautifulsoup4==4.12.2
+beautifulsoup4
 nest-asyncio==1.6.0
 sentry-sdk==2.0.1
